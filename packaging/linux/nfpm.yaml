@@ -1,8 +1,9 @@
-# Linux packages (.deb, .rpm, Arch). Built by `make packages`; needs nfpm.
+# Linux packages (.deb, .rpm). `make packages` fills in @ARCH@ and @VERSION@
+# and runs nfpm on the result.
 name: pulsedeck
-arch: ${PKG_ARCH}
+arch: @ARCH@
 platform: linux
-version: ${VERSION}
+version: @VERSION@
 section: utils
 maintainer: Pulsedeck contributors <noreply@github.com>
 description: |
@@ -13,7 +14,7 @@ license: GPL-3.0-or-later
 recommends:
   - playerctl
 contents:
-  - src: dist/pulsedeck-linux-${PKG_ARCH}
+  - src: dist/pulsedeck-linux-@ARCH@
     dst: /usr/bin/pulsedeck
     file_info:
       mode: 0755

@@ -30,8 +30,10 @@ packages: dist  ## Linux .deb / .rpm / .tar.gz (needs nfpm)
 	  tar -C dist -czf dist/pulsedeck-linux-$$arch.tar.gz --transform "s/pulsedeck-linux-$$arch/pulsedeck/" pulsedeck-linux-$$arch 2>/dev/null || \
 	  tar -C dist -czf dist/pulsedeck-linux-$$arch.tar.gz -s "/pulsedeck-linux-$$arch/pulsedeck/" pulsedeck-linux-$$arch; \
 	  for fmt in deb rpm; do \
-	    PKG_ARCH=$$arch VERSION=$(VERSION) nfpm package -f packaging/linux/nfpm.yaml -p $$fmt -t dist/pulsedeck-linux-$$arch.$$fmt; \
+	    sed -e "s/@ARCH@/$$arch/g" -e "s/@VERSION@/$(VERSION)/g" packaging/linux/nfpm.yaml > dist/nfpm-$$arch.yaml && \
+	    nfpm package -f dist/nfpm-$$arch.yaml -p $$fmt -t dist/pulsedeck-linux-$$arch.$$fmt || exit 1; \
 	  done; \
+	  rm -f dist/nfpm-$$arch.yaml; \
 	done
 
 apk:            ## Android client (debug-signed unless a release keystore is configured)
