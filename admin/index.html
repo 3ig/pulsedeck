@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulsedeck settings</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>
+:root {
+  --bg: #0a0c11; --panel: #12151d; --card: #151821; --line: rgba(255,255,255,.08); --track: rgba(255,255,255,.07);
+  --fg: #eef0f6; --muted: #8a90a2; --accent: #7c5cff; --ok: #22c55e; --crit: #f43f5e; --warn: #f5a524;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root { --bg: #f1f2f6; --panel: #fff; --card: #fff; --line: rgba(10,12,20,.1); --track: rgba(10,12,20,.06); --fg: #12141a; --muted: #6b7183; color-scheme: light; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+main { max-width: 860px; margin: 0 auto; padding: 28px 20px 80px; }
+header { display: flex; align-items: center; gap: 14px; margin-bottom: 26px; }
+header img { width: 52px; height: 52px; border-radius: 14px; }
+header h1 { font-size: 22px; margin: 0; letter-spacing: -.02em; }
+header p { margin: 0; color: var(--muted); font-size: 14px; }
+header .spacer { flex: 1; }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px 22px; margin-bottom: 16px; }
+h2 { font-size: 16px; margin: 0 0 4px; letter-spacing: -.01em; }
+.lead { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
+button, input, select { font: inherit; color: inherit; }
+.btn { border: 1px solid var(--line); background: var(--track); border-radius: 10px; padding: 8px 14px; font-size: 14px; font-weight: 550; cursor: pointer; white-space: nowrap; }
+.btn:hover { border-color: var(--accent); }
+a.btn { text-decoration: none; color: inherit; display: inline-block; }
+.btn.primary { background: var(--accent); border-color: transparent; color: #fff; }
+.btn.quiet { background: transparent; }
+.btn.danger { color: var(--crit); }
+.btn:disabled { opacity: .5; cursor: default; }
+input[type=text], input[type=number], select { background: var(--track); border: 1px solid transparent; border-radius: 10px; padding: 8px 11px; min-width: 0; outline: none; width: 100%; }
+input:focus, select:focus { border-color: var(--accent); }
+label.f { display: block; font-size: 12.5px; color: var(--muted); }
+label.f > span { display: block; margin-bottom: 4px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+.actions { display: flex; gap: 10px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+.note { color: var(--muted); font-size: 13px; }
+
+/* pairing */
+.pair { display: grid; grid-template-columns: 208px 1fr; gap: 24px; align-items: start; }
+.pair img { width: 208px; height: 208px; border-radius: 14px; background: #fff; padding: 10px; image-rendering: pixelated; }
+.pair ol { margin: 0 0 14px; padding-left: 20px; }
+.pair li { margin-bottom: 6px; }
+.copy { display: flex; gap: 8px; margin-bottom: 10px; }
+.copy code { flex: 1; background: var(--track); border-radius: 10px; padding: 8px 11px; font: 13.5px ui-monospace, "SF Mono", Menlo, Consolas, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.token code { font-size: 17px; letter-spacing: .08em; flex: none; }
+@media (max-width: 620px) { .pair { grid-template-columns: 1fr; } }
+
+/* lists */
+.row { display: grid; gap: 10px; align-items: end; padding: 12px 0; border-top: 1px solid var(--line); }
+.row:first-of-type { border-top: 0; }
+.row.action { grid-template-columns: 1.3fr 1fr 1.6fr .9fr auto; }
+.row.plugin { grid-template-columns: 1fr .6fr 2fr .7fr auto; }
+.row .tools { display: flex; gap: 6px; }
+@media (max-width: 760px) { .row.action, .row.plugin { grid-template-columns: 1fr 1fr; } }
+.device { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.device:first-child { border-top: 0; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); flex: none; }
+.device small { color: var(--muted); margin-left: auto; }
+.empty { color: var(--muted); padding: 6px 0; }
+.switch { display: inline-flex; background: var(--track); border-radius: 10px; padding: 3px; }
+.switch button { border: 0; background: transparent; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+.switch button.on { background: var(--panel); box-shadow: 0 1px 3px rgba(0,0,0,.25); font-weight: 600; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.chip { background: var(--track); border-radius: 99px; padding: 4px 12px; font-size: 13px; }
+.chip b { font-weight: 650; }
+#toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 18px; box-shadow: 0 10px 30px rgba(0,0,0,.3); font-size: 14px; }
+#toast[hidden] { display: none; }
+#toast.bad { border-color: var(--crit); }
+#veil { position: fixed; inset: 0; background: color-mix(in srgb, var(--bg) 85%, transparent); display: grid; place-items: center; font-size: 17px; }
+#veil[hidden] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="/icon.svg" alt="">
+    <div><h1>Pulsedeck</h1><p id="sub">Loading…</p></div>
+    <div class="spacer"></div>
+    <a class="btn" href="/" target="_blank">Open dashboard</a>
+  </header>
+
+  <section id="pair">
+    <h2>Pair a phone or tablet</h2>
+    <p class="lead">Devices on your network show this computer's dashboard. Pairing lets them also press buttons on it.</p>
+    <div class="pair">
+      <img id="qr" alt="Pairing QR code">
+      <div>
+        <ol>
+          <li><b>Any device:</b> scan the code with its camera, or open the address below in a browser.</li>
+          <li><b>Pulsedeck app:</b> it finds this computer by itself. To use buttons, enter the pairing token under <i>Manage computers</i>.</li>
+        </ol>
+        <label class="f"><span>Address</span></label>
+        <div class="copy"><code id="url"></code><button class="btn" data-copy="url">Copy</button></div>
+        <label class="f"><span>Pairing token</span></label>
+        <div class="copy token"><code id="token"></code><button class="btn" data-copy="token">Copy</button><button class="btn quiet" id="regen">New token</button></div>
+        <p class="note">Monitoring needs no token. Only buttons do, and only buttons you defined below can ever be run.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Connected devices</h2>
+    <p class="lead">Screens showing this computer right now.</p>
+    <div id="devices"></div>
+  </section>
+
+  <section>
+    <h2>This computer</h2>
+    <p class="lead">How it appears to your devices.</p>
+    <div class="grid2">
+      <label class="f"><span>Name</span><input type="text" id="name" maxlength="48"></label>
+      <label class="f"><span>Update every</span><select id="interval"></select></label>
+      <label class="f"><span>Port</span><input type="number" id="port" min="1024" max="65535"></label>
+      <label class="f" id="autostart-f"><span>Start at login</span><div class="switch" id="autostart"><button data-v="1">On</button><button data-v="0">Off</button></div></label>
+    </div>
+    <div class="actions"><button class="btn primary" id="save-general">Save</button><span class="note">Pulsedeck restarts itself to apply these; devices reconnect on their own.</span></div>
+  </section>
+
+  <section>
+    <h2>Buttons</h2>
+    <p class="lead">What paired devices are allowed to do on this computer. Add them to a dashboard with <i>Add widget → Action button</i>.</p>
+    <div id="actions"></div>
+    <div class="actions"><button class="btn" id="add-action">Add button</button><button class="btn primary" id="save-actions">Save buttons</button></div>
+  </section>
+
+  <section>
+    <h2>Plugins</h2>
+    <p class="lead">Any command that prints a number becomes a sensor you can put on a dashboard.</p>
+    <div id="plugins"></div>
+    <div class="actions"><button class="btn" id="add-plugin">Add plugin</button><button class="btn primary" id="save-plugins">Save plugins</button></div>
+  </section>
+
+  <section>
+    <h2>About</h2>
+    <p class="lead" id="about"></p>
+    <div class="chips" id="sensors"></div>
+    <div class="actions"><button class="btn danger" id="quit">Quit Pulsedeck</button></div>
+  </section>
+</main>
+<div id="toast" hidden></div>
+<div id="veil" hidden>Restarting Pulsedeck…</div>
+
+<script>
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const h = (tag, attrs = {}, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k === 'class') el.className = v;
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid);
+  return el;
+};
+let state = null, actions = [], plugins = [], dirty = false;
+// ?demo swaps this computer's real addresses and devices for invented ones (documentation screenshots).
+const DEMO = /[?&]demo\b/.test(location.search);
+
+let toastTimer;
+function toast(msg, bad) {
+  const t = $('#toast');
+  t.textContent = msg; t.hidden = false; t.classList.toggle('bad', !!bad);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, bad ? 6000 : 2500);
+}
+async function post(path, body) {
+  const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Pulsedeck-Admin': '1' }, body: JSON.stringify(body || {}) });
+  if (!res.ok) throw new Error((await res.text()).trim() || 'Request failed');
+  return res.json();
+}
+
+// Commands are stored as a list of arguments; show and edit them as one line.
+const quote = (a) => (/^[\w@%+=:,.\/~-]+$/.test(a) ? a : '"' + a.replace(/(["\\])/g, '\\$1') + '"');
+const joinCmd = (argv) => (argv || []).map(quote).join(' ');
+function splitCmd(line) {
+  const out = []; let cur = '', q = null, has = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (q) { if (c === '\\' && q === '"' && i + 1 < line.length) cur += line[++i]; else if (c === q) q = null; else cur += c; }
+    else if (c === '"' || c === "'") { q = c; has = true; }
+    else if (/\s/.test(c)) { if (cur || has) out.push(cur); cur = ''; has = false; }
+    else cur += c;
+  }
+  if (cur || has) out.push(cur);
+  return out;
+}
+
+const MEDIA = [['playpause', 'Play / pause'], ['next', 'Next track'], ['prev', 'Previous track'], ['volup', 'Volume up'], ['voldown', 'Volume down'], ['mute', 'Mute']];
+const TYPES = [['media', 'Media key'], ['open', 'Open a link, file or app'], ['command', 'Run a command'], ['lock', 'Lock the screen']];
+const ICONS = ['play', 'next', 'prev', 'volup', 'voldown', 'mute', 'lock', 'link', 'terminal', 'bolt', 'power'];
+const sel = (options, value, onchange) => h('select', { onchange: (e) => onchange(e.target.value) }, options.map(([v, l]) => h('option', { value: v, selected: v === value }, l)));
+const field = (label, control) => h('label', { class: 'f' }, h('span', {}, label), control);
+const touch = () => { dirty = true; };
+
+function drawActions() {
+  $('#actions').replaceChildren(...actions.map((a, i) => {
+    let arg;
+    if (a.type === 'media') arg = field('Key', sel(MEDIA, a.arg, (v) => { a.arg = v; touch(); }));
+    else if (a.type === 'open') arg = field('What to open', h('input', { type: 'text', value: a.arg || '', placeholder: 'https://… or /path/to/app', oninput: (e) => { a.arg = e.target.value; touch(); } }));
+    else if (a.type === 'command') arg = field('Command', h('input', { type: 'text', value: joinCmd(a.command), placeholder: '/usr/local/bin/backup.sh --now', oninput: (e) => { a.command = splitCmd(e.target.value); touch(); } }));
+    else arg = field('\u00a0', h('input', { type: 'text', value: 'No options', disabled: true }));
+    return h('div', { class: 'row action' },
+      field('Label', h('input', { type: 'text', value: a.label || '', oninput: (e) => { a.label = e.target.value; touch(); } })),
+      field('Does', sel(TYPES, a.type, (v) => { a.type = v; if (v === 'media') a.arg = 'playpause'; else if (v !== 'open') delete a.arg; touch(); drawActions(); })),
+      arg,
+      field('Icon', sel([['', 'Automatic'], ...ICONS.map((x) => [x, x])], a.icon || '', (v) => { a.icon = v; touch(); })),
+      h('div', { class: 'tools' },
+        h('button', { class: 'btn', title: 'Run this button now on this computer', disabled: !a.saved, onclick: async () => {
+          try { const r = await post('/api/admin/test', { id: a.id }); toast(r.ok ? `"${a.label}" ran` : r.error, !r.ok); } catch (e) { toast(e.message, true); }
+        } }, 'Test'),
+        h('button', { class: 'btn quiet danger', title: 'Remove', onclick: () => { actions.splice(i, 1); touch(); drawActions(); } }, '✕')));
+  }));
+  if (!actions.length) $('#actions').append(h('div', { class: 'empty' }, 'No buttons yet.'));
+}
+
+function drawPlugins() {
+  $('#plugins').replaceChildren(...plugins.map((p, i) => h('div', { class: 'row plugin' },
+    field('Name', h('input', { type: 'text', value: p.label || p.id || '', placeholder: 'Battery', oninput: (e) => { p.label = e.target.value; if (!p.saved) p.id = e.target.value; touch(); } })),
+    field('Unit', h('input', { type: 'text', value: p.unit || '', placeholder: '%', oninput: (e) => { p.unit = e.target.value; touch(); } })),
+    field('Command (prints a number)', h('input', { type: 'text', value: joinCmd(p.command), placeholder: 'sh -c "…"', oninput: (e) => { p.command = splitCmd(e.target.value); touch(); } })),
+    field('Every (s)', h('input', { type: 'number', min: 1, value: Math.round((p.interval_ms || 5000) / 1000), oninput: (e) => { p.interval_ms = Math.max(1, +e.target.value || 5) * 1000; touch(); } })),
+    h('div', { class: 'tools' }, h('button', { class: 'btn quiet danger', title: 'Remove', onclick: () => { plugins.splice(i, 1); touch(); drawPlugins(); } }, '✕')))));
+  if (!plugins.length) $('#plugins').append(h('div', { class: 'empty' }, 'No plugins. Example: a command that prints the battery percentage.'));
+}
+
+const ago = (ms) => { const s = Math.max(0, (Date.now() - ms) / 1000); return s < 90 ? 'just now' : s < 5400 ? Math.round(s / 60) + ' min' : Math.round(s / 3600) + ' h'; };
+function drawLive() {
+  $('#sub').textContent = `${state.name} · running on port ${state.port} · v${state.version}`;
+  $('#url').textContent = state.pair_url.replace(/#.*$/, '');
+  $('#url').dataset.full = state.pair_url;
+  $('#token').textContent = state.token;
+  $('#devices').replaceChildren(...state.devices.map((d) => h('div', { class: 'device' }, h('span', { class: 'dot' }), h('b', {}, d.kind), h('span', { class: 'note' }, d.addr), h('small', {}, 'connected ' + ago(d.since)))));
+  if (!state.devices.length) $('#devices').append(h('div', { class: 'empty' }, 'Nothing connected yet. Scan the code above with a phone or tablet.'));
+}
+
+async function load(first) {
+  let s;
+  try { s = await (await fetch('/api/admin/state', { cache: 'no-store' })).json(); } catch { return; }
+  if (DEMO) Object.assign(s, { port: 7878, pair_url: 'http://192.168.1.20:7878/#token=' + s.token, devices: [{ kind: 'Android', addr: '192.168.1.42', since: Date.now() - 3 * 3600e3 }, { kind: 'iOS', addr: '192.168.1.57', since: Date.now() - 12 * 60e3 }] });
+  const tokenChanged = !state || state.token !== s.token || state.pair_url !== s.pair_url;
+  state = s;
+  drawLive();
+  if (tokenChanged) $('#qr').src = '/api/admin/qr.png?' + (DEMO ? 'demo&' : '') + Date.now();
+  if (!first) return;
+  document.title = 'Pulsedeck — ' + s.name;
+  $('#name').value = s.name;
+  $('#port').value = s.port;
+  const steps = [[500, 'Half a second'], [1000, '1 second'], [2000, '2 seconds'], [5000, '5 seconds']];
+  if (!steps.some(([v]) => v === s.interval_ms)) steps.push([s.interval_ms, s.interval_ms / 1000 + ' seconds']);
+  $('#interval').replaceChildren(...steps.map(([v, l]) => h('option', { value: v, selected: v === s.interval_ms }, l)));
+  $('#autostart-f').hidden = !s.autostart_supported;
+  for (const b of $('#autostart').children) b.classList.toggle('on', (b.dataset.v === '1') === s.autostart);
+  actions = (s.actions || []).map((a) => ({ ...a, saved: true }));
+  plugins = (s.plugins || []).map((p) => ({ ...p, saved: true }));
+  drawActions(); drawPlugins();
+  const osName = { darwin: 'macOS', linux: 'Linux', windows: 'Windows' }[s.os] || s.os;
+  $('#about').textContent = `Pulsedeck ${s.version} on ${osName}, reading ${s.sensor_count} sensors. Settings file: ${s.config_path}`;
+  $('#sensors').replaceChildren(...Object.entries(s.sensor_groups).sort((a, b) => b[1] - a[1]).map(([g, n]) => h('span', { class: 'chip' }, g + ' ', h('b', {}, n))));
+}
+
+// After a restart the server may be on a different port: wait for it, then go there.
+async function awaitRestart(port) {
+  $('#veil').hidden = false;
+  const base = `${location.protocol}//${location.hostname}:${port}`;
+  for (let i = 0; i < 60; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    try { await fetch(base + '/api/ping', { mode: 'no-cors', cache: 'no-store' }); location.href = base + '/admin/'; return; } catch { /* not up yet */ }
+  }
+  $('#veil').textContent = 'Pulsedeck did not come back. Start it again from your applications.';
+}
+async function save(body, okMsg) {
+  try {
+    const r = await post('/api/admin/config', body);
+    dirty = false;
+    if (r.restart) return awaitRestart(r.port);
+    toast(okMsg);
+    await load(true);
+  } catch (e) { toast(e.message, true); }
+}
+const clean = (list) => list.map(({ saved, ...rest }) => rest);
+
+$('#save-general').onclick = () => save({ name: $('#name').value, port: +$('#port').value, interval_ms: +$('#interval').value }, 'Saved');
+$('#save-actions').onclick = () => save({ actions: clean(actions) }, 'Buttons saved');
+$('#save-plugins').onclick = () => save({ plugins: clean(plugins) }, 'Plugins saved');
+$('#add-action').onclick = () => { actions.push({ id: '', label: '', type: 'media', arg: 'playpause' }); touch(); drawActions(); };
+$('#add-plugin').onclick = () => { plugins.push({ id: '', label: '', unit: '', command: [], interval_ms: 5000 }); touch(); drawPlugins(); };
+$('#autostart').onclick = async (e) => {
+  const v = e.target.dataset.v;
+  if (!v) return;
+  try { await post('/api/admin/autostart', { enabled: v === '1' }); for (const b of $('#autostart').children) b.classList.toggle('on', b === e.target); toast(v === '1' ? 'Pulsedeck will start when you log in' : 'Pulsedeck will no longer start at login'); } catch (err) { toast(err.message, true); }
+};
+$('#regen').onclick = async () => {
+  if (!confirm('Create a new pairing token? Devices paired with the old one keep monitoring, but their buttons stop working until you pair them again.')) return;
+  try { await post('/api/admin/token'); await load(false); toast('New token created'); } catch (e) { toast(e.message, true); }
+};
+$('#quit').onclick = async () => {
+  if (!confirm('Quit Pulsedeck? Your devices will show this computer as offline.')) return;
+  try { await post('/api/admin/quit'); } catch { /* it is going away */ }
+  $('#veil').textContent = 'Pulsedeck has quit. You can close this page.'; $('#veil').hidden = false;
+};
+document.addEventListener('click', (e) => {
+  const id = e.target.dataset?.copy;
+  if (!id) return;
+  const el = $('#' + id);
+  navigator.clipboard.writeText(el.dataset.full || el.textContent).then(() => toast('Copied'), () => toast('Could not copy', true));
+});
+addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+load(true);
+setInterval(() => load(false), 3000);
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Pulsedeck
+Comment=Show this computer's CPU, GPU, memory and temperatures on a phone or tablet
+Exec=pulsedeck
+Icon=pulsedeck
+Terminal=false
+Categories=System;Monitor;
+Keywords=monitor;dashboard;sensors;temperature;

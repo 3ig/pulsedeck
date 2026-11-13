@@ -1,0 +1,25 @@
+# Linux packages (.deb, .rpm, Arch). Built by `make packages`; needs nfpm.
+name: pulsedeck
+arch: ${PKG_ARCH}
+platform: linux
+version: ${VERSION}
+section: utils
+maintainer: Pulsedeck contributors <noreply@github.com>
+description: |
+  Turns a phone or tablet into a live dashboard for this computer:
+  CPU, GPU, memory, temperatures, fans and more.
+homepage: https://github.com/3ig/pulsedeck
+license: GPL-3.0-or-later
+recommends:
+  - playerctl
+contents:
+  - src: dist/pulsedeck-linux-${PKG_ARCH}
+    dst: /usr/bin/pulsedeck
+    file_info:
+      mode: 0755
+  - src: packaging/linux/pulsedeck.desktop
+    dst: /usr/share/applications/pulsedeck.desktop
+  - src: packaging/linux/pulsedeck.png
+    dst: /usr/share/icons/hicolor/256x256/apps/pulsedeck.png
+  - src: LICENSE
+    dst: /usr/share/licenses/pulsedeck/LICENSE
