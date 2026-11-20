@@ -143,11 +143,12 @@ class Conn {
   connect() {
     if (this.dead) return;
     clearTimeout(this.timer); // never let a pending retry open a second socket
+    this.last = Date.now();
     this.setStatus('connecting');
     let ws;
     try { ws = new WebSocket(wsUrl(this.server)); } catch { this.setStatus('closed'); return; }
     this.ws = ws;
-    ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch { return; } this.onMsg(m); };
+    ws.onmessage = (e) => { if (this.ws !== ws) return; this.last = Date.now(); let m; try { m = JSON.parse(e.data); } catch { return; } this.onMsg(m); };
     ws.onclose = () => {
       if (this.ws !== ws) return;
       this.setStatus('closed');
@@ -158,6 +159,22 @@ class Conn {
     };
     ws.onerror = () => ws.close();
   }
+  // reset abandons the current socket and connects afresh. A socket whose
+  // other end vanished (computer powered off, tablet slept, Wi-Fi dropped)
+  // never reports that by itself: it just stays "open" and silent.
+  reset() {
+    const ws = this.ws;
+    this.ws = null; // the old socket's late events are ignored from here on
+    try { ws?.close(); } catch { /* already gone */ }
+    clearTimeout(this.timer);
+    for (const [, cb] of this.pending) cb(false, 'Disconnected');
+    this.pending.clear();
+    this.setStatus('closed');
+    this.retry = 1000;
+    this.connect();
+  }
+  // quiet: no message for clearly longer than the server's update interval.
+  get stale() { return Date.now() - this.last > Math.max(5000, 4 * (this.interval || 1000)); }
   setStatus(s) { this.status = s; renderDock(); scheduleUpdate(); tellNative(); refreshComputers(); if (s === 'closed' && this.server.id === activeServer()) update(); }
   onMsg(m) {
     if (m.type === 'hello') {
@@ -213,12 +230,30 @@ class Conn {
 let lastWake, lastConnected;
 function tellNative() {
   if (!native?.setWake) return;
-  const hosts = JSON.stringify(state.servers.map((s) => wsUrl(s).replace(/^ws:\/\//, '').replace(/\/ws$/, '')));
+  // Computers can be excluded (an always-on server should not keep the screen lit).
+  const waking = state.servers.filter((s) => s.wake !== false);
+  const hosts = JSON.stringify(waking.map((s) => wsUrl(s).replace(/^ws:\/\//, '').replace(/\/ws$/, '')));
   const wakeKey = state.wake + hosts;
   if (wakeKey !== lastWake) { lastWake = wakeKey; native.setWake(!!state.wake, hosts); }
-  const connected = [...conns.values()].some((c) => c.status === 'open');
+  const connected = waking.some((s) => conns.get(s.id)?.status === 'open');
   if (connected !== lastConnected) { lastConnected = connected; native.setConnected(connected); }
 }
+
+// Watchdog: notice connections that went quiet and reconnect them.
+setInterval(() => {
+  for (const c of conns.values()) {
+    if (c instanceof DemoConn || c.dead) continue;
+    if ((c.status === 'open' && c.stale) || (c.status === 'connecting' && Date.now() - c.last > 8000)) c.reset();
+  }
+}, 2000);
+// Called when the screen comes back (by the page itself and by the native
+// shells): timers were frozen while asleep, so every connection is suspect.
+window.__pulsedeckResume = () => {
+  for (const c of conns.values()) {
+    if (c instanceof DemoConn || c.dead) continue;
+    if (c.status !== 'open' || Date.now() - c.last > 2 * (c.interval || 1000) + 1000) c.reset();
+  }
+};
 
 // A pretend server: same messages a real one sends, generated in the page.
 class DemoConn extends Conn {
@@ -1033,6 +1068,27 @@ function openPalette() {
 }
 
 let refreshComputers = () => {}; // keeps the open Computers panel's status lines live
+// What Android still needs from the user for "wake with computer" to be
+// dependable, each with a one-tap way to grant it.
+function powerRows() {
+  let st = {};
+  try { st = JSON.parse(native.powerStatus()); } catch { /* older shell */ }
+  const row = (label, ok, hint, grant) => h('div', { class: 'pc-card' },
+    h('div', { class: 'pc-head' }, h('span', { class: 'dot ' + (ok ? 'open' : 'connecting') }),
+      h('div', { class: 'grow' }, h('b', {}, label), h('small', { style: 'white-space:normal' }, hint)),
+      !ok && h('button', { class: 'btn primary', onclick: () => { grant(); const again = () => { if (!document.hidden) { document.removeEventListener('visibilitychange', again); if (!$('#sheet').hidden) openComputers(); } }; document.addEventListener('visibilitychange', again); } }, 'Allow')));
+  return h('div', {},
+    row('Turn the screen off', st.screenOff,
+      st.screenOff ? 'Pulsedeck switches the screen off about a minute after the last computer disconnects.'
+        : st.stayAwake ? 'This device is set to stay awake while charging, so it will not sleep by itself. Allow Pulsedeck to switch the screen off.'
+          : `Without this the screen only goes off after the device's own timeout (${st.timeoutSec ? Math.round(st.timeoutSec) + ' s' : 'see Display settings'}).`,
+      () => native.requestScreenOff()),
+    row('Keep watching while asleep', st.background,
+      st.background ? 'Pulsedeck may use the network while the screen is off, to notice a computer coming online.'
+        : 'Android may cut Pulsedeck off from the network after a while asleep, so it would miss a computer coming online.',
+      () => native.requestBackground()));
+}
+
 // Computers have their own panel (reached from the switcher), separate from
 // the look-and-feel settings.
 function openComputers() {
@@ -1049,7 +1105,8 @@ function openComputers() {
             state.servers = state.servers.filter((x) => x !== sv); state.profiles = state.profiles.filter((x) => x.server !== sv.id); delete state.sel[sv.id];
             save(); syncConns(); draw(); render();
           } })),
-        field('Pairing token', textInput(sv.token, (v) => { sv.token = v.trim(); save(); }, { placeholder: 'needed for buttons' })));
+        field('Pairing token', textInput(sv.token, (v) => { sv.token = v.trim(); save(); }, { placeholder: 'needed for buttons' })),
+        native?.setWake && state.wake && field('Wakes this screen', seg([[true, 'On'], [false, 'Off']], sv.wake !== false, (v) => { if (v) delete sv.wake; else sv.wake = false; save(); tellNative(); })));
     }));
     if (!state.servers.length) list.append(h('p', { class: 'hint' }, native ? 'No computers yet. Start Pulsedeck on a computer on this network and it will appear here.' : 'No computers yet.'));
   };
@@ -1084,8 +1141,9 @@ function openComputers() {
       h('button', { class: 'btn primary', html: icon('plus') + 'Add', onclick: add })),
     h('p', { class: 'hint' }, native ? 'Computers on the same network are found automatically. Add one by address only if it does not show up.' : 'Enter the address Pulsedeck prints on that computer.'),
     native?.setWake && h('h3', {}, 'Screen'),
-    native?.setWake && field('Wake with computer', seg([[true, 'On'], [false, 'Off']], !!state.wake, (v) => { state.wake = v; save(); tellNative(); })),
-    native?.setWake && h('p', { class: 'hint' }, 'The screen turns on when a computer comes online and is allowed to sleep when none is connected. Keep this device on its charger for that to work reliably.'));
+    native?.setWake && field('Wake with computer', seg([[true, 'On'], [false, 'Off']], !!state.wake, (v) => { state.wake = v; save(); tellNative(); openComputers(); })),
+    native?.setWake && h('p', { class: 'hint' }, 'The screen turns on when a computer comes online and goes off when none is connected. A computer can be left out with its "Wakes this screen" switch, for example a server that never sleeps.'),
+    native?.powerStatus && state.wake && powerRows());
 }
 
 function openSettings() {
@@ -1190,8 +1248,7 @@ matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyThem
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;
   keepAwake();
-  // Coming back (e.g. the screen just woke): reconnect now, not on the next retry.
-  for (const c of conns.values()) if (c.status === 'closed') { c.retry = 1000; c.connect(); }
+  window.__pulsedeckResume();
 });
 // In the native shells the shell itself decides when the screen may sleep.
 async function keepAwake() { if (native) return; try { await navigator.wakeLock?.request('screen'); } catch { /* not allowed right now */ } }

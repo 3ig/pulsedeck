@@ -150,12 +150,24 @@ after 12 hours.
 
 ## Wake with computer (Android)
 
-*Computer name in the dock → Manage computers → Wake with computer.* With it on, the tablet's screen is
-allowed to sleep (after the system's normal timeout) whenever no computer is
-connected, and turns itself back on within a few seconds of the computer
-coming online. A small foreground service keeps checking for the server while
-the screen is off, so leave the tablet on its charger. Turning the screen off
-by hand while the computer is running does not wake it again.
+*Computer name in the dock → Manage computers → Wake with computer.* With it
+on, the tablet's screen turns on within a few seconds of a computer coming
+online and goes off when none is connected.
+
+* **Leave a computer out** with its *Wakes this screen* switch, for example a
+  server or laptop that never sleeps; otherwise the screen stays on for as long
+  as that one is reachable.
+* **Turning the screen off:** by default the screen is released to the
+  device's own timeout. Tablets set to stay awake while charging never reach
+  it, so the panel offers *Allow* next to "Turn the screen off": Android then
+  asks you to make Pulsedeck a device admin app, with the single ability to
+  lock the screen.
+* **Watching while asleep:** allow "Keep watching while asleep" too, or Android
+  may cut the app off from the network after a while.
+
+A small foreground service does the watching, so leave the tablet on its
+charger. Turning the screen off by hand while a computer is running does not
+wake it again.
 
 ## Security model
 

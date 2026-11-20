@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Pulsedeck</string>
+    <string name="admin_label">Pulsedeck screen control</string>
+    <string name="admin_description">Lets Pulsedeck switch the screen off when no computer is connected. It cannot do anything else.</string>
 </resources>

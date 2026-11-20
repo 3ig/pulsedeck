@@ -2,6 +2,8 @@ package app.pulsedeck.client
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -10,6 +12,11 @@ import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.PowerManager
+import android.provider.Settings
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
@@ -130,6 +137,36 @@ class MainActivity : Activity() {
             applyKeepAwake()
         }
 
+        /** What Android still needs granted for wake-with-computer, as JSON. */
+        @JavascriptInterface
+        fun powerStatus(): String {
+            val power = getSystemService(Context.POWER_SERVICE) as PowerManager
+            return JSONObject()
+                .put("screenOff", policy().isAdminActive(adminComponent()))
+                .put("background", power.isIgnoringBatteryOptimizations(packageName))
+                .put("stayAwake", Settings.Global.getInt(contentResolver, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, 0) != 0)
+                .put("timeoutSec", Settings.System.getInt(contentResolver, Settings.System.SCREEN_OFF_TIMEOUT, 0) / 1000)
+                .toString()
+        }
+
+        /** Opens Android's own screen for making Pulsedeck a device admin app (screen-off only). */
+        @JavascriptInterface
+        fun requestScreenOff() = runOnUiThread {
+            val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
+                .putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent())
+                .putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, getString(R.string.admin_description))
+            runCatching { startActivity(intent) }
+        }
+
+        /** Opens Android's prompt for exempting Pulsedeck from battery optimisation. */
+        @SuppressLint("BatteryLife")
+        @JavascriptInterface
+        fun requestBackground() = runOnUiThread {
+            runCatching {
+                startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
+            }
+        }
+
         @JavascriptInterface
         fun saveFile(name: String, data: String) = runOnUiThread {
             pendingSave = data
@@ -160,15 +197,41 @@ class MainActivity : Activity() {
     }
 
     private var anyConnected = false
+    private val handler = Handler(Looper.getMainLooper())
+    private val screenOff = Runnable { turnScreenOff() }
+
+    private fun policy() = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+    private fun adminComponent() = ComponentName(this, ScreenAdmin::class.java)
 
     /**
      * Normally the screen simply stays on. With "wake with computer" enabled it
-     * stays on only while a computer is connected, so the tablet goes to sleep
-     * (after the system's own timeout) when the computer is switched off.
+     * stays on only while a computer is connected. Once none is, the screen is
+     * released to the system's own timeout, and after a grace period Pulsedeck
+     * switches it off itself if the user allowed that (the system timeout does
+     * nothing on devices set to stay awake while charging).
      */
     private fun applyKeepAwake() {
-        if (!WakeService.enabled(this) || anyConnected) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        handler.removeCallbacks(screenOff)
+        if (!WakeService.enabled(this) || anyConnected) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            handler.postDelayed(screenOff, SCREEN_OFF_GRACE_MS)
+        }
+    }
+
+    private fun turnScreenOff() {
+        if (!WakeService.enabled(this) || anyConnected || !hasWindowFocus()) return
+        if (policy().isAdminActive(adminComponent())) runCatching { policy().lockNow() }
+    }
+
+    /** Using the tablet (adding a computer, say) restarts the grace period. */
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN && !anyConnected && WakeService.enabled(this)) {
+            handler.removeCallbacks(screenOff)
+            handler.postDelayed(screenOff, SCREEN_OFF_GRACE_MS)
+        }
+        return super.dispatchTouchEvent(ev)
     }
 
     // ---- mDNS discovery of _pulsedeck._tcp servers ----
@@ -242,12 +305,16 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         web.onResume()
+        // Connections made before the screen went off are not to be trusted.
+        web.evaluateJavascript("window.__pulsedeckResume && window.__pulsedeckResume()", null)
+        applyKeepAwake()
         if (discoveryWanted) startDiscovery()
     }
 
     override fun onPause() {
         discoveryWanted = discovery != null
         stopDiscovery()
+        handler.removeCallbacks(screenOff)
         web.onPause()
         super.onPause()
     }
@@ -295,5 +362,6 @@ class MainActivity : Activity() {
         const val REQ_PICK = 1
         const val REQ_SAVE = 2
         const val REQ_NOTIFY = 3
+        const val SCREEN_OFF_GRACE_MS = 60_000L
     }
 }

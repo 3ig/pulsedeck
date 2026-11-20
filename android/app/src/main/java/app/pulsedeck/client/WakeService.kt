@@ -23,9 +23,9 @@ import kotlin.concurrent.thread
  * does. The dashboard itself lets the screen sleep while no computer is
  * connected (see MainActivity.setConnected).
  *
- * Waking is edge-triggered: only a server that was unreachable and became
- * reachable wakes the device, so switching the screen off by hand while the
- * computer is running stays off.
+ * Waking is edge-triggered and per computer: a computer that was unreachable
+ * and became reachable wakes the device, so switching the screen off by hand
+ * while a computer is running stays off.
  */
 class WakeService : Service() {
     @Volatile private var running = false
@@ -51,11 +51,22 @@ class WakeService : Service() {
     }
 
     private fun watch(pm: PowerManager) {
-        var reachable = true // assume up, so starting the service never wakes the screen by itself
+        // Reachability is tracked per computer: with one machine that never
+        // sleeps, "is anything reachable" would never change and the screen
+        // would never wake for the others. A computer's first observation only
+        // sets the baseline, so starting the service never wakes the screen.
+        val reachable = HashMap<String, Boolean>()
         while (running) {
-            val now = servers(this).any { (host, port) -> canConnect(host, port) }
-            if (now && !reachable && !pm.isInteractive) wakeScreen(pm)
-            reachable = now
+            val current = servers(this)
+            var cameOnline = false
+            for ((host, port) in current) {
+                val key = "$host:$port"
+                val now = canConnect(host, port)
+                if (now && reachable[key] == false) cameOnline = true
+                reachable[key] = now
+            }
+            reachable.keys.retainAll(current.map { (h, p) -> "$h:$p" }.toSet())
+            if (cameOnline && !pm.isInteractive) wakeScreen(pm)
             Thread.sleep(if (pm.isInteractive) 15_000 else 4_000)
         }
     }

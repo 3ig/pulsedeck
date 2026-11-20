@@ -436,11 +436,46 @@ func main() {
 	mux.Handle("/", http.FileServer(http.FS(static)))
 
 	// Announce on the local network so clients find us without typing an IP.
-	mdns, err := announce(cfg)
-	if err != nil {
-		log.Printf("mDNS announce failed (clients must add this server by address): %v", err)
+	// The announcement carries this machine's address, which changes when it
+	// moves between networks or gets a new lease, so it is renewed whenever
+	// the address does.
+	var (
+		mdnsMu sync.Mutex
+		mdns   *zeroconf.Server
+		mdnsIP string
+	)
+	primaryIP := func() string {
+		if ips := lanIPs(); len(ips) > 0 {
+			return ips[0]
+		}
+		return ""
 	}
+	reannounce := func() {
+		ip := primaryIP()
+		mdnsMu.Lock()
+		defer mdnsMu.Unlock()
+		if mdns != nil && ip == mdnsIP {
+			return
+		}
+		if mdns != nil {
+			mdns.Shutdown()
+			mdns = nil
+		}
+		srv, err := announce(cfg)
+		if err != nil {
+			log.Printf("mDNS announce failed (clients must add this server by address): %v", err)
+			return
+		}
+		mdns, mdnsIP = srv, ip
+	}
+	reannounce()
+	go func() {
+		for range time.Tick(15 * time.Second) {
+			reannounce()
+		}
+	}()
 	app.quit = func() {
+		mdnsMu.Lock()
 		if mdns != nil {
 			mdns.Shutdown()
 		}
